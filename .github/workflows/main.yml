@@ -1,0 +1,50 @@
+name: Build APK da zip
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cerca TaskGuard.zip
+        id: chk
+        run: |
+          if [ -f TaskGuard.zip ]; then echo "ok=true" >> $GITHUB_OUTPUT; else echo "Carica TaskGuard.zip nella root del repo"; echo "ok=false" >> $GITHUB_OUTPUT; fi
+
+      - name: Estrai lo zip
+        if: steps.chk.outputs.ok == 'true'
+        run: |
+          unzip -q TaskGuard.zip -d _src
+          echo "PROJ=$(dirname "$(find _src -name settings.gradle.kts | head -1)")" >> $GITHUB_ENV
+
+      - uses: actions/setup-java@v4
+        if: steps.chk.outputs.ok == 'true'
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+        if: steps.chk.outputs.ok == 'true'
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.chk.outputs.ok == 'true'
+        with:
+          gradle-version: 8.9
+
+      - name: Build debug APK
+        if: steps.chk.outputs.ok == 'true'
+        working-directory: ${{ env.PROJ }}
+        run: gradle assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        if: steps.chk.outputs.ok == 'true'
+        with:
+          name: TaskGuard-debug
+          path: ${{ env.PROJ }}/app/build/outputs/apk/debug/app-debug.apk
